@@ -35,6 +35,16 @@ class Options
       localStorage.flipWait_ms = ms
     else
       localStorage.flipWait_ms || Options.defaults.flipWait_ms
+      
+  # Accessor for user set flip wait timing or the default.
+  reload_pages: (pages) ->
+    if pages
+      localStorage.reload_pages = pages
+    else
+      localStorage.reload_pages || Options.defaults.reload_pages
+      
+    pages = pages.split(",")
+  
   
   # Accessor for user set automatic start preference.
   automaticStart: (value) ->
@@ -49,7 +59,9 @@ Options.defaults =
   # Interval between tabs, in ms.
   flipWait_ms: 15 * 1000,
   # Interval between reloading a tab, in ms.  Let's not kill other people's servers with automated requests.
-  reloadWait_ms: 5 * 60 * 1000
+  reloadWait_ms: 5 * 60 * 1000,
+  
+  reload_pages: {'http://www.google.com,http://www.gmail.com'}
 
 root.Options = Options
 options = new Options
@@ -58,6 +70,7 @@ class OptionsController
   constructor: (form) ->
     @form = form
     @form.flipWait_ms.value = options.flipWait_ms()
+    @form.reload_pages.value = options.reload_pages()
     @form.automaticStart.checked = options.automaticStart()
     @form.onsubmit = @onsubmit
 
@@ -83,9 +96,10 @@ class Carousel
   constructor: ->
     # Keep track of the last time a tab was refreshed so we can wait at least 5 minutes betweent refreshes.
     @lastReloads_ms = {}
+    @pages = []
   
   # Reload the given tab, if it has been more than reloadWait_ms ago since it's last been reloaded.
-  reload: (tabId) ->
+  reload: (tabId, page_url) ->
     now_ms = Date.now()
     lastReload_ms = @lastReloads_ms[tabId]
   
@@ -93,7 +107,7 @@ class Carousel
       # If a tab fails reloading, the host shows up as chrome://chromewebdata/
       # Protocol chrome:// URLs can't be reloaded through script injection, but you can simulate a reload using tabs.update.
       chrome.tabs.get tabId, (t) =>
-        chrome.tabs.update(tabId, url: t.url)
+        chrome.tabs.update(tabId, url: page_url)
       @lastReloads_ms[tabId] = now_ms
   
   # Select the given tab count, mod the number of tabs currently open.
@@ -101,11 +115,11 @@ class Carousel
   # @seealso http://code.google.com/chrome/extensions/tabs.html
   # @seealso http://code.google.com/chrome/extensions/content_scripts.html#pi
   select: (windowId, count) ->
-    chrome.tabs.getAllInWindow windowId, (tabs) =>
-      tab = tabs[count % tabs.length]
-      nextTab = tabs[(count + 1) % tabs.length]
+    chrome.tabs.getCurrent (tab) =>
+      tabId = tab.id
+      nextPage = pages[(count + 1) % pages.length]
       chrome.tabs.update(tab.id, selected: true)
-      @reload(nextTab.id)
+      @reload(tabId, nextPage)
   
   # Put the carousel into motion.
   start: (ms) ->
@@ -114,6 +128,9 @@ class Carousel
   
     unless ms
       ms = options.flipWait_ms()
+      
+    unless pages
+      pages = options.reload_pages()
   
     chrome.windows.getCurrent (w) =>
       windowId = w.id

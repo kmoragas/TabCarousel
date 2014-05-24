@@ -41,9 +41,7 @@ class Options
     if pages
       localStorage.reload_pages = pages
     else
-      localStorage.reload_pages || Options.defaults.reload_pages
-      
-    pages = pages.split(",")
+      localStorage.reload_pages.split(",") || Options.defaults.reload_pages.split(",")
   
   
   # Accessor for user set automatic start preference.
@@ -61,7 +59,7 @@ Options.defaults =
   # Interval between reloading a tab, in ms.  Let's not kill other people's servers with automated requests.
   reloadWait_ms: 5 * 60 * 1000,
   
-  reload_pages: {'http://www.google.com,http://www.gmail.com'}
+  reload_pages: 'http://www.google.com,http://www.gmail.com'
 
 root.Options = Options
 options = new Options
